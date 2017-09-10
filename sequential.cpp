@@ -1,6 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
-
+#include "opencv2/videoio.hpp"
 using namespace cv;
 using namespace std;
 
@@ -39,8 +39,10 @@ int main(int argc, char* argv[])
 	{
 		cap >> frame;
 		if (frame.empty()){
-			break;
-			cout << "breakig" << endl;
+			
+		cout << "end of video" << endl;
+		break;
+			
 		}
 		Mat inverted(frame.rows, frame.cols, CV_8UC3);
 		bitwise_not(frame, inverted);
