@@ -16,11 +16,11 @@ Mat ProcessFrame(Mat frame)
 int main(int argc, char* argv[])
 {
  if(argc != 4) {
-      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2 "<<" where 2 is the number of threads to use"<<endl;
+      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2"<<" where 2 is the number of threads to use"<<endl;
       return(-1); 
     }
 	
-	//int bufferSize=atoi(argv[4]);
+	int bufferSize=atoi(argv[3]);
 	VideoCapture cap(argv[1]);
 	VideoWriter vwr;
 	if (!cap.isOpened())
@@ -49,12 +49,12 @@ int main(int argc, char* argv[])
 		Mat * frame = new Mat();
 	    	if(cap.read(*frame)){
 			workersPromises.push_back(future<Mat>( async(ProcessFrame, (*frame).clone())));
-			cout<<++ctr<<endl;
+			//cout<<++ctr<<endl;
 			if(workersPromises.size()>=bufferSize){
+				//cout<<"reached "<<workersPromises.size()<<"workers"<<endl;
 				cout<<"flushing frames..."<<endl;
-				for(size_t i;i<workersPromises.size();i++){
+				for(size_t i=0;i<workersPromises.size();i++){
 					vwr.write(workersPromises[i].get());
-					cout<<"should be writing frame now"<<endl;
 					//delete workersPromises[i];
 				}
 				workersPromises.clear();
@@ -73,7 +73,7 @@ int main(int argc, char* argv[])
 	}
 	if(workersPromises.size()>0){
 		cout<<"Final Flush :D"<<endl;
-		for(size_t i;i<workersPromises.size();i++){
+		for(size_t i=0;i<workersPromises.size();i++){
 				Mat result = workersPromises[i].get();
 				vwr.write(result);
 		}

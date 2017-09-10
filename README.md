@@ -8,6 +8,8 @@ parallel.cpp is the parallel implementation
 
 sequential.cpp is a simplesequential implementation
 
+threaded.cpp is the c++11 threading implementation
+
 the current filter is just flipping the video frames and inverting their pixels intensities,but of course it is easy to modify this
 
 check out build.sh for building and running either of the files.

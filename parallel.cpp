@@ -43,10 +43,10 @@ struct Worker : ff_node_t<Mat> {
 struct Collector: ff_node_t<Mat> {
 VideoWriter vwr;
 vector<Mat>buffer;
-//int outBufferSize=0;
-    Collector(string outputVideoPath,int ex, Size S,int fps/*,int bufferSize*/) {
+int outBufferSize=0;
+    Collector(string outputVideoPath,int ex, Size S,int fps,int bufferSize) {
 		vwr.open(outputVideoPath, ex, fps, S);
-		//outBufferSize = bufferSize;
+		outBufferSize = bufferSize;
 		}
     Mat *svc (Mat * frame) {
 	if (!vwr.isOpened()){
@@ -54,31 +54,30 @@ vector<Mat>buffer;
 		vwr.release();
 		return EOS;
 		}
-	vwr.write(*frame);
-	/*buffer.push_back((*frame).clone());
+	buffer.push_back((*frame).clone());
 	if(buffer.size()>=outBufferSize){
 	cout<<"flushing the output buffer..."<<endl;
-	for(size_t i;i<buffer.size();i++){
+	for(size_t i=0;i<buffer.size();i++){
 	vwr.write(buffer[i]);
 	}
 	buffer.clear();
 	
-	}*/
+	}
 	delete frame;
 	return GO_ON;
     }
 
  void svc_end(){ 
-	/*cout<<"closing the collector"<<endl;
+	cout<<"closing the collector"<<endl;
 	if(buffer.size()>0){
 		cout<<"Finaaaaal Fluuuuush [pun intended :D ] ..."<<endl;
-		for(size_t i;i<buffer.size();i++){
+		for(size_t i=0;i<buffer.size();i++){
 			vwr.write(buffer[i]);
 
 		}
 	buffer.clear();
 	
-	}*/
+	}
         vwr.release(); 
     }  
 
@@ -87,8 +86,8 @@ vector<Mat>buffer;
 
 int main(int argc, char* argv[])
 {
-    if(argc != 4) {
-      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2"<<endl<<"where 2 is the number of workers "<<endl; 
+    if(argc != 5) {
+      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2 100"<<endl<<"where 2 is the number of workers and 100 is the max number of frames allowed in the output buffer"<<endl; 
       return(-1); 
     }
     
@@ -118,7 +117,7 @@ int main(int argc, char* argv[])
             return wrkrptrs;
         } ());
 
-    Collector collector(argv[2],ex,S,fps/*,atol(argv[4])*/);
+    Collector collector(argv[2],ex,S,fps,atol(argv[4]));
     ofarm.setCollectorF(collector);
     pipe.add_stage(ofarm);
     ffTime(START_TIME);

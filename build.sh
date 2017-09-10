@@ -1,2 +1,2 @@
-g++ -I$FF_ROOT -I/usr/local/include -I/usr/local/include/opencv/ -I/usr/local/include/opencv2 -L/usr/lib/x86_64-linux-gnu/ -g -o run  parallel.cpp -lopencv_dnn -lopencv_ml -lopencv_objdetect -lopencv_shape -lopencv_stitching -lopencv_superres -lopencv_videostab -lopencv_calib3d -lopencv_features2d -lopencv_highgui -lopencv_videoio -lopencv_imgcodecs -lopencv_video -lopencv_photo -lopencv_imgproc -lopencv_flann -lopencv_core -std=c++11 -pthread
+g++ -I$FF_ROOT -I/usr/local/include -I/usr/local/include/opencv/ -I/usr/local/include/opencv2 -L/usr/lib/x86_64-linux-gnu/ -g -o run parallel.cpp -lopencv_videoio -lopencv_core -std=c++11 -pthread
 
