@@ -6,13 +6,13 @@ using namespace std;
 
 int main(int argc, char* argv[])
 {
-	// File path for input video
-	string projectSrcDir = ".";
-	string inputVideoPath = projectSrcDir + "/Data/piazza-dei-cavalieri.mp4";
-	string outputVideoPath = projectSrcDir + "/Data/output-piazza-dei-cavalieri.mp4";
-
+ if(argc != 3) {
+      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath "<<endl;
+      return(-1); 
+    }
+	
 	//reading the video
-	VideoCapture cap(inputVideoPath);
+	VideoCapture cap(argv[1]);
 	VideoWriter vwr;
 	if (!cap.isOpened())
 		throw "Error when reading video file";
@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 	Size S = Size((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),    // Acquire input size
 		(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT));
 
-	vwr.open(outputVideoPath, ex, cap.get(CV_CAP_PROP_FPS), S);
+	vwr.open(argv[2], ex, cap.get(CV_CAP_PROP_FPS), S);
 	cout << "Input frame resolution: Width=" << S.width << "  Height=" << S.height
 		<< " of nr#: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
 	cout << "Input codec type: " << EXT << endl;
