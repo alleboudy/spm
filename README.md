@@ -2,7 +2,7 @@
 
 http://didawiki.cli.di.unipi.it/doku.php/magistraleinformaticanetworking/spm/start
 
-Using FastFlow to parallelize the application of a filter via OpenCV
+Using FastFlow to parallelize the application of a filter via OpenCV 3 on a video
 
 parallel.cpp is the implementation using fastflow
 
@@ -14,7 +14,7 @@ The current filter is just flipping the video frames and inverting their pixels 
 
 
 ## How to compile
-Will need to have OpenCV installed and the fastflow root folder present on the machine 
+Will need to have OpenCV 3 installed and the fastflow root folder present on the machine 
 
 In the project repository main folder run the build.sh file or type in a terminal the following:
 
