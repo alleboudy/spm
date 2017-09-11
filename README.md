@@ -14,9 +14,11 @@ The current filter is just flipping the video frames and inverting their pixels 
 
 
 ## How to compile
-Will need to have OpenCV 3 installed and the fastflow root folder present on the machine 
+Will need to have OpenCV installed and the fastflow root folder present on the machine 
 
 In the project repository main folder run the build.sh file or type in a terminal the following:
+
+For OpenCV 3 :
 
 g++ -I$FF_ROOT -I/usr/local/include -I/usr/local/include/opencv/ -I/usr/local/include/opencv2 -L/usr/lib/x86_64-linux-gnu/ -g -o run parallel.cpp -lopencv_videoio -lopencv_core -std=c++11 -pthread
 
@@ -27,6 +29,12 @@ Where $FF_ROOT is where the fastflow root folder
 “parallel.cpp” is the parallel implementation [could also do sequential.cpp or threaded.cpp instead]
 
 other imports are for the openCV
+
+For OpenCV2 :
+
+Use  the include <opencv2/highgui/highgui.hpp> instead of "opencv2/videoio.hpp" in the code and the compile command 
+
+g++ -I$FF_ROOT -I/usr/local/include -I/usr/local/include/opencv/ -I/usr/local/include/opencv2 -L/usr/lib/x86_64-linux-gnu/ -g -o run parallel.cpp -lopencv_highgui -lopencv_core -std=c++11 -pthread
 
 ## To run the compiled Binary type
 #### For the parallel.cpp 
