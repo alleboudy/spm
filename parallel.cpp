@@ -1,5 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
+//#include <opencv2/highgui/highgui.hpp>
 #include "opencv2/videoio.hpp"
 #include <ff/pipeline.hpp>
 #include <ff/farm.hpp>
@@ -108,7 +109,8 @@ int main(int argc, char* argv[])
     cout << "Input codec type: " << EXT << endl;
     cout << "Frame  width=" << S.width << " ,   height=" << S.height<< " number of frames: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
     int numOfWorkers = atol(argv[3]);
-    ff_Pipe<> pipe(make_unique<Emitter>(cap));
+    
+    Emitter emitter(cap);
     ff_OFarm<Mat> ofarm( [numOfWorkers]() {
             vector<unique_ptr<ff_node> > wrkrptrs; 
             for(size_t i=0; i<numOfWorkers; i++){ 
@@ -118,10 +120,11 @@ int main(int argc, char* argv[])
         } ());
 
     Collector collector(argv[2],ex,S,fps,atol(argv[4]));
+    ofarm.setEmitterF(emitter);
     ofarm.setCollectorF(collector);
-    pipe.add_stage(ofarm);
+    
     ffTime(START_TIME);
-    if (pipe.run_and_wait_end()<0) {
+    if (ofarm.run_and_wait_end()<0) {
         cerr<<"runtime error, exiting!"<<endl;
         return -1;
     }
