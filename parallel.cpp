@@ -71,8 +71,9 @@ struct Worker : ff_node_t<Mat> {
 	}
    	Mat * svc(Mat* frame) {
 
-	//bitwise_not(*frame, *frame);
-	//flip(*frame, *frame, 0);
+	
+	bitwise_not(*frame, *frame);
+	flip(*frame, *frame, 0);
 
    	long cols=(*frame).cols, rows = (*frame).rows;
 	ParallelFor pr(numSubWrkrs);
@@ -176,7 +177,7 @@ int main(int argc, char* argv[])
             return wrkrptrs;
         } ());
 
-    Collector collector(argv[2],ex,S,fps,atol(argv[4]));
+    Collector collector(argv[2],CV_FOURCC('M', 'J', 'P', 'G'),S,fps,atol(argv[4]));
     ofarm.setEmitterF(emitter);
     ofarm.setCollectorF(collector);
     
