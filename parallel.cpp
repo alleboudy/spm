@@ -4,12 +4,43 @@
 #include "opencv2/videoio.hpp"
 #include <ff/pipeline.hpp>
 #include <ff/farm.hpp>
+#include <ff/parallel_for.hpp>
+#include <thread>
 
 using namespace cv;
 using namespace std;
 using namespace ff;
 
 
+
+/* ----- utility function ------- */ 
+template<typename T> 
+T *Mat2uchar(cv::Mat &in) { 
+	T *out = new T[in.rows * in.cols]; 
+	for (int i = 0; i < in.rows; ++i) 
+		for (int j = 0; j < in.cols; ++j) 
+			out[i * (in.cols) + j] = in.at<T>(i, j); 
+	return out; 
+} 
+#define XY2I(Y,X,COLS) (((Y) * (COLS)) + (X)) 
+// returns the gradient in the x direction 
+static inline long xGradient(uchar * image, long cols, long x, long y) { 
+	return image[XY2I(y-1, x-1, cols)] + 
+		2*image[XY2I(y, x-1, cols)] + 
+		image[XY2I(y+1, x-1, cols)] - 
+		image[XY2I(y-1, x+1, cols)] - 
+		2*image[XY2I(y, x+1, cols)] - 
+		image[XY2I(y+1, x+1, cols)]; 
+} 
+// returns the gradient in the y direction 
+static inline long yGradient(uchar * image, long cols, long x, long y) { 
+	return image[XY2I(y-1, x-1, cols)] + 
+		2*image[XY2I(y-1, x, cols)] + 
+		image[XY2I(y-1, x+1, cols)] - 
+		image[XY2I(y+1, x-1, cols)] - 
+		2*image[XY2I(y+1, x, cols)] - 
+		image[XY2I(y+1, x+1, cols)]; 
+} 
 
 
 struct Emitter : ff_node_t<Mat> {
@@ -18,8 +49,9 @@ struct Emitter : ff_node_t<Mat> {
     Mat * svc(Mat *) {
 	while(true) {
 		Mat * frame = new Mat();
-	    if(cap.read(*frame))
-  		ff_send_out(frame);
+	    if(cap.read(*frame)){
+	    cvtColor(*frame, *frame, CV_RGB2GRAY); 
+  		ff_send_out(frame);}
 	    else{
 		cout << "end of video file" << endl;
 		break;	
@@ -33,9 +65,30 @@ struct Emitter : ff_node_t<Mat> {
 
 
 struct Worker : ff_node_t<Mat> {
+	int numSubWrkrs=1;
+	Worker(int numberOfSubWorkers){
+	numSubWrkrs = numberOfSubWorkers;
+	}
    	Mat * svc(Mat* frame) {
-	bitwise_not(*frame, *frame);
-	flip(*frame, *frame, 0);
+
+	//bitwise_not(*frame, *frame);
+	//flip(*frame, *frame, 0);
+
+   	long cols=(*frame).cols, rows = (*frame).rows;
+	ParallelFor pr(numSubWrkrs);
+	uchar * src=Mat2uchar<uchar>(*frame);
+	pr.parallel_for(1,rows-1,[src,cols,rows](const long y) { 
+			for(long x = 1; x < cols - 1; x++){ 
+				const long gx = xGradient(src, cols-1, x, y); 
+				const long gy = yGradient(src, cols-1, x, y); 
+				// approximation of sqrt(gx*gx+gy*gy) 
+				long sum = abs(gx) + abs(gy); 
+				if (sum > 255) sum = 255; 
+				else if (sum < 0) sum = 0; 
+				src[y*cols+x] = sum; 
+			} 
+		}); 
+	(*frame) = cv::Mat((*frame).rows, (*frame).cols, CV_8U, src, cv::Mat::AUTO_STEP);
 	return frame;
   }
 }; 
@@ -108,13 +161,17 @@ int main(int argc, char* argv[])
     int fps=cap.get(CV_CAP_PROP_FPS);
     cout << "Input codec type: " << EXT << endl;
     cout << "Frame  width=" << S.width << " ,   height=" << S.height<< " number of frames: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
-    int numOfWorkers = atol(argv[3]);
+    int numOfWorkers = atoi(argv[3]);
     
     Emitter emitter(cap);
-    ff_OFarm<Mat> ofarm( [numOfWorkers]() {
+    unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
+    int possibleNumOfCores = (concurentThreadsSupported-numOfWorkers)/numOfWorkers;
+    int numOfSubWorkers=possibleNumOfCores>0?possibleNumOfCores:1;
+
+    ff_OFarm<Mat> ofarm( [numOfWorkers,numOfSubWorkers]() {
             vector<unique_ptr<ff_node> > wrkrptrs; 
             for(size_t i=0; i<numOfWorkers; i++){ 
-                wrkrptrs.push_back(make_unique<Worker>());
+                wrkrptrs.push_back(make_unique<Worker>(numOfSubWorkers));
 		}
             return wrkrptrs;
         } ());
