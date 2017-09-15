@@ -86,8 +86,8 @@ struct Worker : ff_node_t<Mat> {
 		for (int x = 1; x < cols-1; ++x)
 		{
 
-			const long gx = xGradient(src, cols-1, x, y); 
-			const long gy = yGradient(src, cols-1, x, y); 
+			const long gx = xGradient(src, cols, x, y); 
+			const long gy = yGradient(src, cols, x, y); 
 			long sum = abs(gx) + abs(gy); 
 			if (sum > 255) sum = 255; 
 			else if (sum < 0) sum = 0; 
