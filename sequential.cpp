@@ -1,6 +1,6 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
-#include "opencv2/videoio.hpp"
+#include <opencv2/highgui/highgui.hpp>
 using namespace cv;
 using namespace std;
 
@@ -26,7 +26,7 @@ int main(int argc, char* argv[])
 	Size S = Size((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),    // Acquire input size
 		(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT));
 
-	vwr.open(argv[2], ex, cap.get(CV_CAP_PROP_FPS), S);
+	vwr.open(argv[2], CV_FOURCC('M','P','4','2'), cap.get(CV_CAP_PROP_FPS), S);
 	cout << "Input frame resolution: Width=" << S.width << "  Height=" << S.height
 		<< " of nr#: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
 	cout << "Input codec type: " << EXT << endl;

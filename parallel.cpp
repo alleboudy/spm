@@ -1,7 +1,8 @@
 #include <iostream>
 #include <opencv2/opencv.hpp>
-//#include <opencv2/highgui/highgui.hpp>
-#include "opencv2/videoio.hpp"
+#include <opencv2/highgui/highgui.hpp>
+//#include "opencv2/videoio.hpp"
+//#include <opencv2/imgproc/imgproc.hpp>
 #include <ff/pipeline.hpp>
 #include <ff/farm.hpp>
 #include <ff/parallel_for.hpp>
@@ -18,8 +19,10 @@ template<typename T>
 T *Mat2uchar(cv::Mat &in) { 
 	T *out = new T[in.rows * in.cols]; 
 	for (int i = 0; i < in.rows; ++i) 
-		for (int j = 0; j < in.cols; ++j) 
-			out[i * (in.cols) + j] = in.at<T>(i, j); 
+		for (int j = 0; j < in.cols; ++j) {
+			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale here as well!
+			out[i * (in.cols) + j] = (intensity.val[0]+intensity.val[1]+intensity.val[2])/3; 
+		}
 	return out; 
 } 
 #define XY2I(Y,X,COLS) (((Y) * (COLS)) + (X)) 
@@ -50,7 +53,7 @@ struct Emitter : ff_node_t<Mat> {
 	while(true) {
 		Mat * frame = new Mat();
 	    if(cap.read(*frame)){
-	    cvtColor(*frame, *frame, CV_RGB2GRAY); 
+	   // cvtColor(*frame, *frame, CV_RGB2GRAY); 
   		ff_send_out(frame);}
 	    else{
 		cout << "end of video file" << endl;
@@ -71,14 +74,27 @@ struct Worker : ff_node_t<Mat> {
 	}
    	Mat * svc(Mat* frame) {
 
-	
-	bitwise_not(*frame, *frame);
-	flip(*frame, *frame, 0);
+	//cout<<endl<<"hello from the other side"<<endl;
+	/*bitwise_not(*frame, *frame);
+	flip(*frame, *frame, 0);*/
 
    	long cols=(*frame).cols, rows = (*frame).rows;
-	ParallelFor pr(numSubWrkrs);
+	//ParallelFor pr(numSubWrkrs);
 	uchar * src=Mat2uchar<uchar>(*frame);
-	pr.parallel_for(1,rows-1,[src,cols,rows](const long y) { 
+	for (int y = 1; y < rows-1; ++y)
+	{
+		for (int x = 1; x < cols-1; ++x)
+		{
+
+			const long gx = xGradient(src, cols-1, x, y); 
+			const long gy = yGradient(src, cols-1, x, y); 
+			long sum = abs(gx) + abs(gy); 
+			if (sum > 255) sum = 255; 
+			else if (sum < 0) sum = 0; 
+			src[y*cols+x] = sum; 
+		}
+	}
+	/*pr.parallel_for(1,rows-1,[src,cols,rows](const long y) { 
 			for(long x = 1; x < cols - 1; x++){ 
 				const long gx = xGradient(src, cols-1, x, y); 
 				const long gy = yGradient(src, cols-1, x, y); 
@@ -88,8 +104,9 @@ struct Worker : ff_node_t<Mat> {
 				else if (sum < 0) sum = 0; 
 				src[y*cols+x] = sum; 
 			} 
-		}); 
-	(*frame) = cv::Mat((*frame).rows, (*frame).cols, CV_8U, src, cv::Mat::AUTO_STEP);
+		}); */
+	(*frame) = Mat((*frame).rows, (*frame).cols, CV_8U, src, Mat::AUTO_STEP);
+   	
 	return frame;
   }
 }; 
@@ -100,7 +117,7 @@ VideoWriter vwr;
 vector<Mat>buffer;
 int outBufferSize=0;
     Collector(string outputVideoPath,int ex, Size S,int fps,int bufferSize) {
-		vwr.open(outputVideoPath, ex, fps, S);
+		vwr.open(outputVideoPath, ex, fps, S,false);
 		outBufferSize = bufferSize;
 		}
     Mat *svc (Mat * frame) {
@@ -177,7 +194,7 @@ int main(int argc, char* argv[])
             return wrkrptrs;
         } ());
 
-    Collector collector(argv[2],CV_FOURCC('M', 'J', 'P', 'G'),S,fps,atol(argv[4]));
+    Collector collector(argv[2],CV_FOURCC('M','P','4','2'),S,fps,atol(argv[4]));
     ofarm.setEmitterF(emitter);
     ofarm.setCollectorF(collector);
     
