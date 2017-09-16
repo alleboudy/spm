@@ -20,7 +20,7 @@ T *Mat2uchar(cv::Mat &in) {
 	T *out = new T[in.rows * in.cols]; 
 	for (int i = 0; i < in.rows; ++i) 
 		for (int j = 0; j < in.cols; ++j) {
-			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale here as well!
+			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale while at it :D
 			out[i * (in.cols) + j] = (intensity.val[0]+intensity.val[1]+intensity.val[2])/3; 
 		}
 	return out; 
@@ -69,8 +69,10 @@ struct Emitter : ff_node_t<Mat> {
 
 struct Worker : ff_node_t<Mat> {
 	int numSubWrkrs=1;
-	Worker(int numberOfSubWorkers){
+	bool sobel=false;
+	Worker(int numberOfSubWorkers,bool sobelApply){
 	numSubWrkrs = numberOfSubWorkers;
+	sobel = sobelApply; 
 	}
    	Mat * svc(Mat* frame) {
 
@@ -79,33 +81,64 @@ struct Worker : ff_node_t<Mat> {
 	flip(*frame, *frame, 0);*/
 
    	long cols=(*frame).cols, rows = (*frame).rows;
-	//ParallelFor pr(numSubWrkrs);
+	ParallelFor pr(numSubWrkrs);
 	uchar * src=Mat2uchar<uchar>(*frame);
-	for (int y = 1; y < rows-1; ++y)
+	bool sob=sobel;
+	double min, max;
+	if(!sobel)
+	cv::minMaxLoc(*frame, &min, &max);
+
+	if (numSubWrkrs>1)
+	{
+		pr.parallel_for(1,rows-1,[src,cols,rows,sob,min,max](const long y) { 
+			for(long x = 1; x < cols - 1; x++){ 
+				if(sob){
+				const long gx = xGradient(src, cols, x, y); 
+				const long gy = yGradient(src, cols, x, y); 
+				// approximation of sqrt(gx*gx+gy*gy) 
+				long sum = abs(gx) + abs(gy); 
+				if (sum > 255) sum = 255; 
+				else if (sum < 0) sum = 0; 
+				src[y*cols+x] = sum;
+			}else{
+
+				src[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
+
+			}
+
+				 
+			} 
+		}); 
+
+	}else{	
+			//well, no need for the parallel for then :D
+
+		for (int y = 1; y < rows-1; ++y)
 	{
 		for (int x = 1; x < cols-1; ++x)
 		{
 
+			if(sobel){
 			const long gx = xGradient(src, cols, x, y); 
 			const long gy = yGradient(src, cols, x, y); 
 			long sum = abs(gx) + abs(gy); 
 			if (sum > 255) sum = 255; 
 			else if (sum < 0) sum = 0; 
 			src[y*cols+x] = sum; 
+		}else{
+				src[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
+		}
 		}
 	}
-	/*pr.parallel_for(1,rows-1,[src,cols,rows](const long y) { 
-			for(long x = 1; x < cols - 1; x++){ 
-				const long gx = xGradient(src, cols-1, x, y); 
-				const long gy = yGradient(src, cols-1, x, y); 
-				// approximation of sqrt(gx*gx+gy*gy) 
-				long sum = abs(gx) + abs(gy); 
-				if (sum > 255) sum = 255; 
-				else if (sum < 0) sum = 0; 
-				src[y*cols+x] = sum; 
-			} 
-		}); */
-	(*frame) = Mat((*frame).rows, (*frame).cols, CV_8U, src, Mat::AUTO_STEP);
+
+
+	}
+
+
+		(*frame) = Mat((*frame).rows, (*frame).cols, CV_8U, src, Mat::AUTO_STEP);
+
+	
+	
    	
 	return frame;
   }
@@ -158,8 +191,8 @@ int outBufferSize=0;
 
 int main(int argc, char* argv[])
 {
-    if(argc != 5) {
-      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2 100"<<endl<<"where 2 is the number of workers and 100 is the max number of frames allowed in the output buffer"<<endl; 
+    if(argc != 6) {
+      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2 100 sobel"<<endl<<"where 2 is the number of workers and 100 is the max number of frames allowed in the output buffer, sobel is the filter to apply [ sobel for the sobel filter, otherwise contrast stretching is applied]"<<endl; 
       return(-1); 
     }
     
@@ -183,13 +216,15 @@ int main(int argc, char* argv[])
     
     Emitter emitter(cap);
     unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
+	cout<<"number of cores: "<<concurentThreadsSupported<<endl;
     int possibleNumOfCores = (concurentThreadsSupported-numOfWorkers)/numOfWorkers;
     int numOfSubWorkers=possibleNumOfCores>0?possibleNumOfCores:1;
-
-    ff_OFarm<Mat> ofarm( [numOfWorkers,numOfSubWorkers]() {
+    bool aplySobel=(argv[5]=="sobel");
+	cout<<"number of subworkers: "<<numOfSubWorkers<<endl;
+    ff_OFarm<Mat> ofarm( [numOfWorkers,numOfSubWorkers,aplySobel]() {
             vector<unique_ptr<ff_node> > wrkrptrs; 
             for(size_t i=0; i<numOfWorkers; i++){ 
-                wrkrptrs.push_back(make_unique<Worker>(numOfSubWorkers));
+                wrkrptrs.push_back(make_unique<Worker>(numOfSubWorkers,aplySobel));
 		}
             return wrkrptrs;
         } ());
