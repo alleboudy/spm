@@ -2,9 +2,13 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <chrono>
+#include <ff/pipeline.hpp>
+#include <ff/farm.hpp>
+#include <ff/parallel_for.hpp>
+
 using namespace cv;
 using namespace std;
-
+using namespace ff;
 /* ----- utility function ------- */ 
 template<typename T> 
 T *Mat2uchar(cv::Mat &in) { 
@@ -42,12 +46,12 @@ static inline long yGradient(uchar * image, long cols, long x, long y) {
 int main(int argc, char* argv[])
 {
 
- if(argc != 4) {
-      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath sobel \n [ sobel for the sobel filter, otherwise contrast stretching is applied]"<<endl;
+ if(argc != 5) {
+      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 3 sobel \n where 3 is the number of workers to use [ sobel for the sobel filter, otherwise contrast stretching is applied]"<<endl;
       return(-1); 
     }
 	
-	bool sobel=(string(argv[3])=="sobel");
+	bool sobel=(string(argv[4])=="sobel");
 	//cout<<"filter is sobel?: "<<sobel<<argv[3]<<endl;
 
 	VideoCapture cap(argv[1]);
@@ -77,7 +81,7 @@ int main(int argc, char* argv[])
 
 	uchar * src;
 	Mat * frame ;
-
+	ParallelFor pr(atoi(argv[3]));
 	while (true)
 	{
 		frame = new Mat();
@@ -90,7 +94,7 @@ int main(int argc, char* argv[])
 				cv::minMaxLoc(*frame, &min, &max);
 
 					//well, no need for the parallel for then :D
-				for (int y = 1; y < rows-1; ++y){
+				pr.parallel_for(1,rows-1,[src,cols,rows,sobel,min,max](const long y) { 
 					for (int x = 1; x < cols-1; ++x){
 						if(sobel){
 						const long gx = xGradient(src, cols, x, y); 
@@ -103,7 +107,7 @@ int main(int argc, char* argv[])
 						src[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
 						}
 					}
-				}
+				});
 
 
 				
