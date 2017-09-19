@@ -9,7 +9,9 @@
 using namespace cv;
 using namespace std;
 using namespace ff;
-/* ----- utility function ------- */ 
+
+//This function does the preprocessing required for both filter
+
 template<typename T> 
 T *PrepareFrame(cv::Mat &in,uchar * dst, int &min, int &max) { 
 	T *out = new T[in.rows * in.cols]; 
@@ -23,6 +25,8 @@ T *PrepareFrame(cv::Mat &in,uchar * dst, int &min, int &max) {
 		}
 	return out; 
 } 
+//very useful for vectorization and fast access to the pixels values
+
 #define XY2I(Y,X,COLS) (((Y) * (COLS)) + (X)) 
 // returns the gradient in the x direction 
 static inline long xGradient(uchar * image, long cols, long x, long y) { 
@@ -55,30 +59,20 @@ int main(int argc, char* argv[])
     }
 	
 	bool sobel=(string(argv[4])=="sobel");
-	//cout<<"filter is sobel?: "<<sobel<<argv[3]<<endl;
 
 	VideoCapture cap(argv[1]);
 	VideoWriter vwr;
 	if (!cap.isOpened())
 		throw "Error when reading video file";
-	//Mat* frame;
-
-	/*int ex = static_cast<int>(cap.get(CV_CAP_PROP_FOURCC));     // Get Codec Type- Int form
-
-	// Transform from int to char via Bitwise operators
-	char EXT[] = { (char)(ex & 0XFF), (char)((ex & 0XFF00) >> 8), (char)((ex & 0XFF0000) >> 16), (char)((ex & 0XFF000000) >> 24), 0 };
-*/
+	
 	long cols=(int)cap.get(CV_CAP_PROP_FRAME_WIDTH), rows = (int)cap.get(CV_CAP_PROP_FRAME_HEIGHT);
 	Size S = Size(cols,rows);
 
 	vwr.open(argv[2], CV_FOURCC('M','P','4','2'), cap.get(CV_CAP_PROP_FPS), S,false);
-	//cout << "Input frame resolution: Width=" << S.width << "  Height=" << S.height
-	//	<< " of nr#: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
-	//cout << "Input codec type: " << EXT << endl;
+	
 	if (!vwr.isOpened())
 		throw "Error when opening the vide writer";
 
-	//namedWindow("w", 1);
 
 	auto started = std::chrono::high_resolution_clock::now();
 
@@ -95,7 +89,6 @@ int main(int argc, char* argv[])
 				int min=255, max=0;
 				 src=PrepareFrame<uchar>(*frame,dst,min,max);
 
-					//well, no need for the parallel for then :D
 				pr.parallel_for(1,rows-1,[src,cols,rows,sobel,min,max,dst](const long y) { 
 					for (int x = 1; x < cols-1; ++x){
 						if(sobel){
@@ -124,24 +117,20 @@ int main(int argc, char* argv[])
 		break;	
 	}
 
-		//imshow("w", inverted);
-	//	waitKey(20); // waits to display frame
-	//delete src;
+		
 	delete frame;
 
 	}
-	//waitKey(0); // key press to close window
-
-	//cout << "done" << endl;
+	
 
 	vwr.release();
 	cap.release();
 
 	auto done = std::chrono::high_resolution_clock::now();
 
-std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(done-started).count()<<endl;
+	std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(done-started).count()<<endl;
 
-return 0;
+	return 0;
 
 }
 

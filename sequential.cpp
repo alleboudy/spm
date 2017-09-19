@@ -5,7 +5,6 @@
 using namespace cv;
 using namespace std;
 
-/* ----- utility function ------- */ 
 template<typename T> 
 T *PrepareFrame(cv::Mat &in, uchar * dst, int &min, int &max) { 
 	T *out = new T[in.rows * in.cols]; 
@@ -51,30 +50,20 @@ int main(int argc, char* argv[])
     }
 	
 	bool sobel=(string(argv[3])=="sobel");
-	//cout<<"filter is sobel?: "<<sobel<<argv[3]<<endl;
 
 	VideoCapture cap(argv[1]);
 	VideoWriter vwr;
 	if (!cap.isOpened())
 		throw "Error when reading video file";
-	//Mat* frame;
-
-	/*int ex = static_cast<int>(cap.get(CV_CAP_PROP_FOURCC));     // Get Codec Type- Int form
-
-	// Transform from int to char via Bitwise operators
-	char EXT[] = { (char)(ex & 0XFF), (char)((ex & 0XFF00) >> 8), (char)((ex & 0XFF0000) >> 16), (char)((ex & 0XFF000000) >> 24), 0 };
-*/
+	
 	long cols=(int)cap.get(CV_CAP_PROP_FRAME_WIDTH), rows = (int)cap.get(CV_CAP_PROP_FRAME_HEIGHT);
 	Size S = Size(cols,rows);
 
 	vwr.open(argv[2], CV_FOURCC('M','P','4','2'), cap.get(CV_CAP_PROP_FPS), S,false);
-	//cout << "Input frame resolution: Width=" << S.width << "  Height=" << S.height
-	//	<< " of nr#: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
-	//cout << "Input codec type: " << EXT << endl;
+	
 	if (!vwr.isOpened())
 		throw "Error when opening the vide writer";
 
-	//namedWindow("w", 1);
 
 	auto started = std::chrono::high_resolution_clock::now();
 
@@ -89,12 +78,7 @@ int main(int argc, char* argv[])
 				dst = new uchar[rows * cols];
 				int min=255, max=0;
 				src=PrepareFrame<uchar>(*frame,dst, min, max);
-				//bool sob=sobel;
-				//double min, max;
-				//if(!sobel)
-				//cv::minMaxLoc(*frame, &min, &max);
-
-					//well, no need for the parallel for then :D
+				
 				for (int y = 1; y < rows-1; ++y){
 					for (int x = 1; x < cols-1; ++x){
 						if(sobel){
@@ -123,14 +107,10 @@ int main(int argc, char* argv[])
 		break;	
 	}
 
-		//imshow("w", inverted);
-	//	waitKey(20); // waits to display frame
-	//delete src;
+	
 	delete frame;
 	}
-	//waitKey(0); // key press to close window
-
-	//cout << "done" << endl;
+	
 
 	vwr.release();
 	cap.release();

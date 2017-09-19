@@ -8,20 +8,22 @@ using namespace cv;
 using namespace std;
 
 
-/* ----- utility function ------- */ 
+//This function does the preprocessing required for both filter
 template<typename T> 
 T *PrepareFrame(Mat &in, uchar * dst, int &min, int &max) { 
 	T *out = new T[in.rows * in.cols]; 
 	for (int i = 0; i < in.rows; ++i) 
 		for (int j = 0; j < in.cols; ++j) {
-			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale while at it :D
+			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale 
 			out[i * (in.cols) + j] = (intensity.val[0]+intensity.val[1]+intensity.val[2])/3; 
-			dst[i * (in.cols) + j]=0;//while at it, setting the resulting frame to 0
-			max=out[i * (in.cols) + j]>max?out[i * (in.cols) + j]:max;
+			dst[i * (in.cols) + j]=0;// setting the resulting frame to 0
+			max=out[i * (in.cols) + j]>max?out[i * (in.cols) + j]:max;//keeping the max and min values
 			min=out[i * (in.cols) + j]<min?out[i * (in.cols) + j]:min;
 		}
 	return out; 
 } 
+//very useful for vectorization and fast access to the pixels values
+
 #define XY2I(Y,X,COLS) (((Y) * (COLS)) + (X)) 
 // returns the gradient in the x direction 
 static inline long xGradient(uchar * image, long cols, long x, long y) { 
@@ -47,13 +49,7 @@ Mat ProcessFrame(Mat frame,bool sobel,int cols,int rows)
 	uchar * dst = new uchar[rows * cols];
 	int min=255, max=0;
 	uchar * src=PrepareFrame<uchar>(frame,dst,min,max);
-	 
-			
 
-				//bool sob=sobel;
-				
-
-					//well, no need for the parallel for then :D
 				for (int y = 1; y < rows-1; ++y){
 					for (int x = 1; x < cols-1; ++x){
 						if(sobel){
@@ -70,10 +66,8 @@ Mat ProcessFrame(Mat frame,bool sobel,int cols,int rows)
 				}
 
 
-				
 
-
-					frame = Mat(rows, cols, CV_8U, dst, Mat::AUTO_STEP);
+				frame = Mat(rows, cols, CV_8U, dst, Mat::AUTO_STEP);
 	return frame;
 }
 
@@ -89,12 +83,6 @@ int main(int argc, char* argv[])
 	VideoWriter vwr;
 	if (!cap.isOpened())
 		throw "Error when reading video file";
-	//Mat frame;
-
-	//int ex = static_cast<int>(cap.get(CV_CAP_PROP_FOURCC));     // Get Codec Type- Int form
-
-	// Transform from int to char via Bitwise operators
-	//char EXT[] = { (char)(ex & 0XFF), (char)((ex & 0XFF00) >> 8), (char)((ex & 0XFF0000) >> 16), (char)((ex & 0XFF000000) >> 24), 0 };
 
 	
 	int cols = (int)cap.get(CV_CAP_PROP_FRAME_WIDTH);
@@ -120,7 +108,7 @@ int main(int argc, char* argv[])
 				//cout<<"flushing frames..."<<endl;
 				for(size_t i=0;i<workersPromises.size();i++){
 					vwr.write(workersPromises[i].get());
-					//delete workersPromises[i];
+					
 				}
 				workersPromises.clear();
 			
@@ -137,7 +125,7 @@ int main(int argc, char* argv[])
 	
 	}
 	if(workersPromises.size()>0){
-		//cout<<"Final Flush :D"<<endl;
+		//cout<<"Final Flush "<<endl;
 		for(size_t i=0;i<workersPromises.size();i++){
 				Mat result = workersPromises[i].get();
 				vwr.write(result);

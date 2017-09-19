@@ -10,7 +10,6 @@ using namespace std;
 
 
 
-/* ----- utility function ------- */ 
 template<typename T> 
 T *PrepareFrame(Mat &in, uchar * dst, int &min, int &max) { 
 	T *out = new T[in.rows * in.cols]; 
@@ -55,9 +54,6 @@ void ProcessFrame(Mat frame,Mat* resultStorage ,bool sobel,int cols,int rows)
 	uchar * src=PrepareFrame<uchar>(frame,dst,min,max);
 	 
 
-				
-
-					//well, no need for the parallel for then :D
 				for (int y = 1; y < rows-1; ++y){
 					for (int x = 1; x < cols-1; ++x){
 						if(sobel){
@@ -78,8 +74,7 @@ void ProcessFrame(Mat frame,Mat* resultStorage ,bool sobel,int cols,int rows)
 
 
 					(*resultStorage) = Mat(rows, cols, CV_8U, dst, Mat::AUTO_STEP);
-					//delete src;
-					//delete dst;
+				
 					
 }
 
@@ -98,56 +93,43 @@ int main(int argc, char* argv[])
 		throw "Error when reading video file";
 	
 
-	/*int ex = static_cast<int>(cap.get(CV_CAP_PROP_FOURCC));     // Get Codec Type- Int form
-
-	// Transform from int to char via Bitwise operators
-	char EXT[] = { (char)(ex & 0XFF), (char)((ex & 0XFF00) >> 8), (char)((ex & 0XFF0000) >> 16), (char)((ex & 0XFF000000) >> 24), 0 };
-*/
+	
 	int cols=(int)cap.get(CV_CAP_PROP_FRAME_WIDTH),rows = (int)cap.get(CV_CAP_PROP_FRAME_HEIGHT);
 	Size S = Size(cols,rows);
 
 	vwr.open(argv[2], CV_FOURCC('M','P','4','2'), cap.get(CV_CAP_PROP_FPS), S,false);
-	//cout << "frame Width=" << S.width << ",  Height=" << S.height<< " number of frames: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
-	//cout << "Input codec type: " << EXT << endl;
+	
 	if (!vwr.isOpened())
 		throw "Error when opening the vide writer";
 
 	auto started = std::chrono::high_resolution_clock::now();
-	//namedWindow("w", 1);
 	Mat workersFrames[bufferSize];
-	//thread workersThreads[bufferSize];// array of bufferSize threads
-	//int ctr=0;
+
 
 	int wrkrCntr=0;
 	vector<thread*> workersThreads;
 	while (true)
 	{
 		Mat*  frame = new Mat();
-			//cout<<"###wrkrCntr###"<<wrkrCntr<<endl;
 	    	if(cap.read(*frame)){
 				workersFrames[wrkrCntr] =  Mat();
 	    		workersThreads.push_back(new thread(ProcessFrame,(*frame), &(workersFrames[wrkrCntr]),sobel,cols,rows));
 	    	
-	    	//workersThreads[wrkrCntr]=thread(ProcessFrame,*frame, &(workersFrames[wrkrCntr]),sobel,cols,rows);
 	    	wrkrCntr++;//one frame = one worker
-	    	//ctr++;
 	    		if (workersThreads.size()==bufferSize)//bs=4 -> instantiated 4 threads already idx[0->3]
 	    		{
 	    			//cout<<"flushing threads results"<<endl;
 	    			for (size_t x = 0; x < wrkrCntr; ++x)
 	    			{
-	    				//error, sometimes the same frame reappears later again :S
 	    				try{
 	    				(*(workersThreads[x])).join();
 	    				}
 	    				 catch (const std::exception& e) { cout<<e.what()<<endl; }
 	    				vwr.write(((workersFrames[x])));
-	    				//workersFrames[x] =  Mat();//making sure it won't be reused!
-	    				//cout<<"flushed: "<<x<<endl;
+	    				
 	    			}
 	    			
 	    			wrkrCntr=0;
-	    			//workersFrames.clear();
 	    			workersThreads.clear();
 	    		}
 	    		
@@ -163,17 +145,14 @@ int main(int argc, char* argv[])
 	}
 	
 	if(wrkrCntr>0){
-		//cout<<"Final Flush :D"<<endl;
-		//cout<<wrkrCntr<<endl;
+		//cout<<"Final Flush "<<endl;
 		for(size_t i=0;i<wrkrCntr;i++){
-			//cout<<i<<endl;
 				(*(workersThreads[i])).join();
 	    		vwr.write(((workersFrames[i])));
 		}
 		
 	}
-//	delete frame;
-	//cout << "done" << endl;
+
 
 	vwr.release();
 	cap.release();

@@ -13,20 +13,22 @@ using namespace ff;
 
 
 
-/* ----- utility function ------- */ 
+//This function does the preprocessing required for both filter
 template<typename T> 
 T *PrepareFrame(cv::Mat &in, uchar * dst, int &min, int &max) { 
 	T *out = new T[in.rows * in.cols]; 
 	for (int i = 0; i < in.rows; ++i) 
 		for (int j = 0; j < in.cols; ++j) {
-			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale while at it :D
+			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale 
 			out[i * (in.cols) + j] = (intensity.val[0]+intensity.val[1]+intensity.val[2])/3; 
-			dst[i * (in.cols) + j]=0;
-			max=out[i * (in.cols) + j]>max?out[i * (in.cols) + j]:max;
+			dst[i * (in.cols) + j]=0;// setting the resulting frame to 0
+			max=out[i * (in.cols) + j]>max?out[i * (in.cols) + j]:max;//keeping the max and min values
 			min=out[i * (in.cols) + j]<min?out[i * (in.cols) + j]:min;
 		}
 	return out; 
 } 
+//very useful for vectorization and fast access to the pixels values
+
 #define XY2I(Y,X,COLS) (((Y) * (COLS)) + (X)) 
 // returns the gradient in the x direction 
 static inline long xGradient(uchar * image, long cols, long x, long y) { 
@@ -55,7 +57,6 @@ struct Emitter : ff_node_t<Mat> {
 	while(true) {
 		Mat * frame = new Mat();
 	    if(cap.read(*frame)){
-	   // cvtColor(*frame, *frame, CV_RGB2GRAY); 
   		ff_send_out(frame);}
 	    else{
 		//cout << "end of video file" << endl;
@@ -78,65 +79,30 @@ struct Worker : ff_node_t<Mat> {
 	}
    	Mat * svc(Mat* frame) {
 
-	//cout<<endl<<"hello from the other side"<<endl;
-	/*bitwise_not(*frame, *frame);
-	flip(*frame, *frame, 0);*/
+
 
    	long cols=(*frame).cols, rows = (*frame).rows;
-	//ParallelFor pr(numSubWrkrs);
 	uchar * dst = new uchar[rows * cols];
 	int min=255, max=0;
 	uchar * src=PrepareFrame<uchar>(*frame,dst,min,max);
-	//bool sob=sobel;
-	
-	//if(!sobel)
-	//cv::minMaxLoc(*frame, &min, &max);
+		
 
-	/*if (numSubWrkrs>1)
-	{
-		pr.parallel_for(1,rows-1,[src,cols,rows,sob,min,max](const long y) { 
-			for(long x = 1; x < cols - 1; x++){ 
-				if(sob){
-				const long gx = xGradient(src, cols, x, y); 
-				const long gy = yGradient(src, cols, x, y); 
-				// approximation of sqrt(gx*gx+gy*gy) 
-				long sum = abs(gx) + abs(gy); 
-				if (sum > 255) sum = 255; 
-				else if (sum < 0) sum = 0; 
-				src[y*cols+x] = sum;
+		for (int y = 1; y < rows-1; ++y){
+			for (int x = 1; x < cols-1; ++x){
+
+				if(sobel){
+					const long gx = xGradient(src, cols, x, y); 
+					const long gy = yGradient(src, cols, x, y); 
+					long sum = abs(gx) + abs(gy); 
+					if (sum > 255) sum = 255; 
+					else if (sum < 0) sum = 0; 
+					dst[y*cols+x] = sum; 
 			}else{
-
-				src[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
-
+					dst[y*cols+x] = 255.0 / (max - min)*(src[y*cols+x] - min);
 			}
-
-				 
-			} 
-		}); 
-
-	}else*/{	
-			//well, no need for the parallel for then :D
-
-		for (int y = 1; y < rows-1; ++y)
-	{
-		for (int x = 1; x < cols-1; ++x)
-		{
-
-			if(sobel){
-			const long gx = xGradient(src, cols, x, y); 
-			const long gy = yGradient(src, cols, x, y); 
-			long sum = abs(gx) + abs(gy); 
-			if (sum > 255) sum = 255; 
-			else if (sum < 0) sum = 0; 
-			dst[y*cols+x] = sum; 
-		}else{
-				dst[y*cols+x] = 255.0 / (max - min)*(src[y*cols+x] - min);
-		}
 		}
 	}
 
-
-	}
 
 
 		(*frame) = Mat(rows, cols, CV_8U, dst, Mat::AUTO_STEP);
@@ -150,12 +116,10 @@ struct Worker : ff_node_t<Mat> {
 
 
 struct Collector: ff_node_t<Mat> {
-VideoWriter vwr;
-//vector<Mat>buffer;
-//int outBufferSize=0;
-    Collector(string outputVideoPath,int ex, Size S,int fps/*,int bufferSize*/) {
+	VideoWriter vwr;
+
+    Collector(string outputVideoPath,int ex, Size S,int fps) {
 		vwr.open(outputVideoPath, ex, fps, S,false);
-		//outBufferSize = bufferSize;
 		}
     Mat *svc (Mat * frame) {
 	if (!vwr.isOpened()){
@@ -164,31 +128,14 @@ VideoWriter vwr;
 		return EOS;
 		}
 
-	/*buffer.push_back((*frame).clone());
-	if(buffer.size()>=outBufferSize){
-	//cout<<"flushing the output buffer..."<<endl;
-	for(size_t i=0;i<buffer.size();i++){
-	vwr.write(buffer[i]);
-	}
-	buffer.clear();
 	
-	}*/
 	vwr.write(*frame);
 	delete frame;
 	return GO_ON;
     }
 
  void svc_end(){ 
-	/*//cout<<"closing the collector"<<endl;
-	if(buffer.size()>0){
-		//cout<<"Finaaaaal Fluuuuush [pun intended :D ] ..."<<endl;
-		for(size_t i=0;i<buffer.size();i++){
-			vwr.write(buffer[i]);
-
-		}
-	buffer.clear();
 	
-	}*/
         vwr.release(); 
     }  
 
@@ -214,27 +161,15 @@ int main(int argc, char* argv[])
 	}
 	
 
-    /*int ex = static_cast<int>(cap.get(CV_CAP_PROP_FOURCC)); 
-    // Transform from int to char via Bitwise operators
-    char EXT[] = { (char)(ex & 0XFF), (char)((ex & 0XFF00) >> 8), (char)((ex & 0XFF0000) >> 16), (char)((ex & 0XFF000000) >> 24), 0 };
-    */Size S = Size((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT));
+    Size S = Size((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT));
     int fps=cap.get(CV_CAP_PROP_FPS);
-    //cout << "Input codec type: " << EXT << endl;
-    //cout << "Frame  width=" << S.width << " ,   height=" << S.height<< " number of frames: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
+   
     int numOfWorkers = atoi(argv[3]);
     
     Emitter emitter(cap);
-    /*unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
-	//cout<<"number of cores: "<<concurentThreadsSupported<<endl;
-    int possibleNumOfCores = (concurentThreadsSupported-numOfWorkers)/numOfWorkers;
-    int numOfSubWorkers=1;
-    if ((string(argv[5])=="sub") &&possibleNumOfCores>0){
-    	numOfSubWorkers =  possibleNumOfCores;
-    	//cout<<"Sub parallelizing with: "<<numOfSubWorkers<<" cores"<<endl;
-    }*/
+    
     
     bool aplySobel=(string(argv[4])=="sobel");
-	//cout<<"number of subworkers: "<<numOfSubWorkers<<endl;
     ff_OFarm<Mat> ofarm( [numOfWorkers,aplySobel]() {
             vector<unique_ptr<ff_node> > wrkrptrs; 
             for(size_t i=0; i<numOfWorkers; i++){ 
@@ -243,20 +178,18 @@ int main(int argc, char* argv[])
             return wrkrptrs;
         } ());
 
-    Collector collector(argv[2],CV_FOURCC('M','P','4','2'),S,fps/*,atoi(argv[4])*/);
+    Collector collector(argv[2],CV_FOURCC('M','P','4','2'),S,fps);
     ofarm.setEmitterF(emitter);
     ofarm.setCollectorF(collector);
     
-   // ffTime(START_TIME);
     if (ofarm.run_and_wait_end()<0) {
         cerr<<"runtime error, exiting!"<<endl;
         return -1;
     }
-   // ffTime(STOP_TIME);
-   // std::cout <<ffTime(GET_TIME) <<endl;    
+  
     auto done = std::chrono::high_resolution_clock::now();
 
-std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(done-started).count()<<endl;
+	std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(done-started).count()<<endl;
 
     return 0;
 
