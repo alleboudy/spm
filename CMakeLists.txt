@@ -8,8 +8,13 @@ add_executable( parallel2 parallel2.cpp )
 add_executable( sequential sequential.cpp )
 add_executable( parallel3 parallel3.cpp )
 add_executable( threaded threaded.cpp )
+add_executable( future future.cpp )
+add_executable( nonOrdparallel nonOrdparallel.cpp )
 target_link_libraries( parallel2 ${OpenCV_LIBS} )
 target_link_libraries( sequential ${OpenCV_LIBS} )
 target_link_libraries( parallel3 ${OpenCV_LIBS} )
 target_link_libraries( threaded ${OpenCV_LIBS} )
+target_link_libraries( future ${OpenCV_LIBS} )
+target_link_libraries( nonOrdparallel ${OpenCV_LIBS} )
+
 

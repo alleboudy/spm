@@ -11,12 +11,15 @@ using namespace std;
 using namespace ff;
 /* ----- utility function ------- */ 
 template<typename T> 
-T *Mat2uchar(cv::Mat &in) { 
+T *PrepareFrame(cv::Mat &in,uchar * dst, int &min, int &max) { 
 	T *out = new T[in.rows * in.cols]; 
 	for (int i = 0; i < in.rows; ++i) 
 		for (int j = 0; j < in.cols; ++j) {
 			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale while at it :D
 			out[i * (in.cols) + j] = (intensity.val[0]+intensity.val[1]+intensity.val[2])/3; 
+			dst[i * (in.cols) + j]=0;
+			max=out[i * (in.cols) + j]>max?out[i * (in.cols) + j]:max;
+			min=out[i * (in.cols) + j]<min?out[i * (in.cols) + j]:min;
 		}
 	return out; 
 } 
@@ -80,21 +83,20 @@ int main(int argc, char* argv[])
 	auto started = std::chrono::high_resolution_clock::now();
 
 	uchar * src;
+	uchar * dst;
 	Mat * frame ;
 	ParallelFor pr(atoi(argv[3]));
 	while (true)
 	{
+		dst = new uchar[rows * cols];
 		frame = new Mat();
 		if(cap.read(*frame)){
 				
-				src=Mat2uchar<uchar>(*frame);
-				//bool sob=sobel;
-				double min, max;
-				if(!sobel)
-				cv::minMaxLoc(*frame, &min, &max);
+				int min=255, max=0;
+				 src=PrepareFrame<uchar>(*frame,dst,min,max);
 
 					//well, no need for the parallel for then :D
-				pr.parallel_for(1,rows-1,[src,cols,rows,sobel,min,max](const long y) { 
+				pr.parallel_for(1,rows-1,[src,cols,rows,sobel,min,max,dst](const long y) { 
 					for (int x = 1; x < cols-1; ++x){
 						if(sobel){
 						const long gx = xGradient(src, cols, x, y); 
@@ -102,9 +104,9 @@ int main(int argc, char* argv[])
 						long sum = abs(gx) + abs(gy); 
 						if (sum > 255) sum = 255; 
 						else if (sum < 0) sum = 0; 
-						src[y*cols+x] = sum; 
+						dst[y*cols+x] = sum; 
 					}else{
-						src[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
+						dst[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
 						}
 					}
 				});
@@ -113,7 +115,7 @@ int main(int argc, char* argv[])
 				
 
 
-					(*frame) = Mat(rows, cols, CV_8U, src, Mat::AUTO_STEP);
+					(*frame) = Mat(rows, cols, CV_8U, dst, Mat::AUTO_STEP);
 					
 					vwr.write(*frame);
 
@@ -126,6 +128,7 @@ int main(int argc, char* argv[])
 	//	waitKey(20); // waits to display frame
 	//delete src;
 	delete frame;
+
 	}
 	//waitKey(0); // key press to close window
 

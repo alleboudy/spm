@@ -5,9 +5,8 @@
 //#include <opencv2/imgproc/imgproc.hpp>
 #include <ff/pipeline.hpp>
 #include <ff/farm.hpp>
-#include <ff/parallel_for.hpp>
 #include <thread>
-
+#include <chrono>
 using namespace cv;
 using namespace std;
 using namespace ff;
@@ -57,7 +56,7 @@ struct Emitter : ff_node_t<Mat> {
 	   // cvtColor(*frame, *frame, CV_RGB2GRAY); 
   		ff_send_out(frame);}
 	    else{
-		cout << "end of video file" << endl;
+		//cout << "end of video file" << endl;
 		break;	
 		}
 	}
@@ -69,10 +68,10 @@ struct Emitter : ff_node_t<Mat> {
 
 
 struct Worker : ff_node_t<Mat> {
-	int numSubWrkrs=1;
+	//int numSubWrkrs=1;
 	bool sobel=false;
-	Worker(int numberOfSubWorkers,bool sobelApply){
-	numSubWrkrs = numberOfSubWorkers;
+	Worker(bool sobelApply){
+	//numSubWrkrs = numberOfSubWorkers;
 	sobel = sobelApply; 
 	}
    	Mat * svc(Mat* frame) {
@@ -82,15 +81,15 @@ struct Worker : ff_node_t<Mat> {
 	flip(*frame, *frame, 0);*/
 
    	long cols=(*frame).cols, rows = (*frame).rows;
-	ParallelFor pr(numSubWrkrs);
-	uchar * dst = new uchar[rows * cols];;
-	uchar * src=Mat2uchar<uchar>(*frame);
+	//ParallelFor pr(numSubWrkrs);
+	uchar * dst = new uchar[rows * cols];
+	uchar * src=Mat2uchar<uchar>(*frame,dst);
 	bool sob=sobel;
 	double min, max;
 	if(!sobel)
 	cv::minMaxLoc(*frame, &min, &max);
 
-	if (numSubWrkrs>1)
+	/*if (numSubWrkrs>1)
 	{
 		pr.parallel_for(1,rows-1,[src,cols,rows,sob,min,max](const long y) { 
 			for(long x = 1; x < cols - 1; x++){ 
@@ -101,10 +100,10 @@ struct Worker : ff_node_t<Mat> {
 				long sum = abs(gx) + abs(gy); 
 				if (sum > 255) sum = 255; 
 				else if (sum < 0) sum = 0; 
-				dst[y*cols+x] = sum;
+				src[y*cols+x] = sum;
 			}else{
 
-				dst[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
+				src[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
 
 			}
 
@@ -112,7 +111,7 @@ struct Worker : ff_node_t<Mat> {
 			} 
 		}); 
 
-	}else{	
+	}else*/{	
 			//well, no need for the parallel for then :D
 
 		for (int y = 1; y < rows-1; ++y)
@@ -171,7 +170,7 @@ VideoWriter vwr;
 	buffer.clear();
 	
 	}*/
-		vwr.write(*frame);
+	vwr.write(*frame);
 	delete frame;
 	return GO_ON;
     }
@@ -195,8 +194,10 @@ VideoWriter vwr;
 
 int main(int argc, char* argv[])
 {
-    if(argc != 6) {
-      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2 100 sobel sub"<<endl<<"where 2 is the number of workers , sobel is the filter to apply [ sobel for the sobel filter, otherwise contrast stretching is applied] and sub allows parallelizing the workers tasks using (numberOfCores-NumberOfWorkers)/numberOfWorkers cores per worker"<<endl; 
+	auto started = std::chrono::high_resolution_clock::now();
+
+    if(argc != 5) {
+      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2 100 sobel"<<endl<<"where 2 is the number of workers , sobel is the filter to apply [ sobel for the sobel filter, otherwise contrast stretching is applied] "<<endl; 
       return(-1); 
     }
     
@@ -210,46 +211,50 @@ int main(int argc, char* argv[])
 	}
 	
 
-    int ex = static_cast<int>(cap.get(CV_CAP_PROP_FOURCC)); 
+    /*int ex = static_cast<int>(cap.get(CV_CAP_PROP_FOURCC)); 
     // Transform from int to char via Bitwise operators
     char EXT[] = { (char)(ex & 0XFF), (char)((ex & 0XFF00) >> 8), (char)((ex & 0XFF0000) >> 16), (char)((ex & 0XFF000000) >> 24), 0 };
-    Size S = Size((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT));
+    */Size S = Size((int)cap.get(CV_CAP_PROP_FRAME_WIDTH),(int)cap.get(CV_CAP_PROP_FRAME_HEIGHT));
     int fps=cap.get(CV_CAP_PROP_FPS);
-    cout << "Input codec type: " << EXT << endl;
-    cout << "Frame  width=" << S.width << " ,   height=" << S.height<< " number of frames: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
+    //cout << "Input codec type: " << EXT << endl;
+    //cout << "Frame  width=" << S.width << " ,   height=" << S.height<< " number of frames: " << cap.get(CV_CAP_PROP_FRAME_COUNT) << endl;
     int numOfWorkers = atoi(argv[3]);
     
     Emitter emitter(cap);
-    unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
-	cout<<"number of cores: "<<concurentThreadsSupported<<endl;
+    /*unsigned concurentThreadsSupported = std::thread::hardware_concurrency();
+	//cout<<"number of cores: "<<concurentThreadsSupported<<endl;
     int possibleNumOfCores = (concurentThreadsSupported-numOfWorkers)/numOfWorkers;
     int numOfSubWorkers=1;
     if ((string(argv[5])=="sub") &&possibleNumOfCores>0){
     	numOfSubWorkers =  possibleNumOfCores;
-    	cout<<"Sub parallelizing with: "<<numOfSubWorkers<<" cores"<<endl;
-    }
+    	//cout<<"Sub parallelizing with: "<<numOfSubWorkers<<" cores"<<endl;
+    }*/
     
     bool aplySobel=(string(argv[4])=="sobel");
-	cout<<"number of subworkers: "<<numOfSubWorkers<<endl;
-    ff_OFarm<Mat> ofarm( [numOfWorkers,numOfSubWorkers,aplySobel]() {
+	//cout<<"number of subworkers: "<<numOfSubWorkers<<endl;
+    ff_Farm<Mat> farm( [numOfWorkers,aplySobel]() {
             vector<unique_ptr<ff_node> > wrkrptrs; 
             for(size_t i=0; i<numOfWorkers; i++){ 
-                wrkrptrs.push_back(make_unique<Worker>(numOfSubWorkers,aplySobel));
+                wrkrptrs.push_back(make_unique<Worker>(aplySobel));
 		}
             return wrkrptrs;
         } ());
 
     Collector collector(argv[2],CV_FOURCC('M','P','4','2'),S,fps/*,atoi(argv[4])*/);
-    ofarm.setEmitterF(emitter);
-    ofarm.setCollectorF(collector);
+    farm.add_emitter(emitter);
+    farm.add_collector(collector);
     
-    ffTime(START_TIME);
-    if (ofarm.run_and_wait_end()<0) {
+   // ffTime(START_TIME);
+    if (farm.run_and_wait_end()<0) {
         cerr<<"runtime error, exiting!"<<endl;
         return -1;
     }
-    ffTime(STOP_TIME);
-    std::cout <<"Run time"<< ffTime(GET_TIME) << " ms"<<endl;    
+   // ffTime(STOP_TIME);
+   // std::cout <<ffTime(GET_TIME) <<endl;    
+    auto done = std::chrono::high_resolution_clock::now();
+
+std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(done-started).count()<<endl;
+
     return 0;
 
 

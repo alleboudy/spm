@@ -3,6 +3,7 @@
 #include <opencv2/highgui/highgui.hpp>
 //#include "opencv2/videoio.hpp"
 #include <thread>
+#include <chrono>
 
 using namespace cv;
 using namespace std;
@@ -11,12 +12,15 @@ using namespace std;
 
 /* ----- utility function ------- */ 
 template<typename T> 
-T *Mat2uchar(cv::Mat &in) { 
+T *PrepareFrame(Mat &in, uchar * dst, int &min, int &max) { 
 	T *out = new T[in.rows * in.cols]; 
 	for (int i = 0; i < in.rows; ++i) 
 		for (int j = 0; j < in.cols; ++j) {
 			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale while at it :D
 			out[i * (in.cols) + j] = (intensity.val[0]+intensity.val[1]+intensity.val[2])/3; 
+			dst[i * (in.cols) + j]=0;//while at it, setting the resulting frame to 0
+			max=out[i * (in.cols) + j]>max?out[i * (in.cols) + j]:max;
+			min=out[i * (in.cols) + j]<min?out[i * (in.cols) + j]:min;
 		}
 	return out; 
 } 
@@ -43,13 +47,15 @@ static inline long yGradient(uchar * image, long cols, long x, long y) {
 
 
 
-void ProcessFrame(Mat frame,Mat *resultStorage,bool sobel,int cols,int rows)
+void ProcessFrame(Mat frame,Mat* resultStorage ,bool sobel,int cols,int rows)
 { 
-	uchar * src=Mat2uchar<uchar>(frame);
-				//bool sob=sobel;
-				double min, max;
-				if(!sobel)
-				cv::minMaxLoc(frame, &min, &max);
+	
+	 uchar * dst = new uchar[rows * cols];
+	int min=255, max=0;
+	uchar * src=PrepareFrame<uchar>(frame,dst,min,max);
+	 
+
+				
 
 					//well, no need for the parallel for then :D
 				for (int y = 1; y < rows-1; ++y){
@@ -60,9 +66,9 @@ void ProcessFrame(Mat frame,Mat *resultStorage,bool sobel,int cols,int rows)
 						long sum = abs(gx) + abs(gy); 
 						if (sum > 255) sum = 255; 
 						else if (sum < 0) sum = 0; 
-						src[y*cols+x] = sum; 
+						dst[y*cols+x] = sum; 
 					}else{
-						src[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
+						dst[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
 						}
 					}
 				}
@@ -71,8 +77,9 @@ void ProcessFrame(Mat frame,Mat *resultStorage,bool sobel,int cols,int rows)
 				
 
 
-					(*resultStorage) = Mat(rows, cols, CV_8U, src, Mat::AUTO_STEP);
+					(*resultStorage) = Mat(rows, cols, CV_8U, dst, Mat::AUTO_STEP);
 					//delete src;
+					//delete dst;
 					
 }
 
@@ -107,33 +114,41 @@ int main(int argc, char* argv[])
 
 	auto started = std::chrono::high_resolution_clock::now();
 	//namedWindow("w", 1);
-	Mat workersFrames[bufferSize];// array of bufferSize frames 
-	thread workersThreads[bufferSize];// array of bufferSize threads
+	Mat workersFrames[bufferSize];
+	//thread workersThreads[bufferSize];// array of bufferSize threads
 	//int ctr=0;
 
 	int wrkrCntr=0;
-	Mat  frame;// = new Mat();
+	vector<thread*> workersThreads;
 	while (true)
 	{
+		Mat*  frame = new Mat();
 			//cout<<"###wrkrCntr###"<<wrkrCntr<<endl;
-	    	if(cap.read(frame)){
-	    	workersFrames[wrkrCntr] =  Mat();
-	    	workersThreads[wrkrCntr]=thread(ProcessFrame,frame, &(workersFrames[wrkrCntr]),sobel,cols,rows);
+	    	if(cap.read(*frame)){
+				workersFrames[wrkrCntr] =  Mat();
+	    		workersThreads.push_back(new thread(ProcessFrame,(*frame), &(workersFrames[wrkrCntr]),sobel,cols,rows));
+	    	
+	    	//workersThreads[wrkrCntr]=thread(ProcessFrame,*frame, &(workersFrames[wrkrCntr]),sobel,cols,rows);
 	    	wrkrCntr++;//one frame = one worker
 	    	//ctr++;
-	    		if (wrkrCntr==bufferSize)//bs=4 -> instantiated 4 threads already idx[0->3]
+	    		if (workersThreads.size()==bufferSize)//bs=4 -> instantiated 4 threads already idx[0->3]
 	    		{
 	    			//cout<<"flushing threads results"<<endl;
 	    			for (size_t x = 0; x < wrkrCntr; ++x)
 	    			{
 	    				//error, sometimes the same frame reappears later again :S
-	    				workersThreads[x].join();
-	    				vwr.write(workersFrames[x]);
-	    				workersFrames[x] =  Mat();//making sure it won't be reused!
+	    				try{
+	    				(*(workersThreads[x])).join();
+	    				}
+	    				 catch (const std::exception& e) { cout<<e.what()<<endl; }
+	    				vwr.write(((workersFrames[x])));
+	    				//workersFrames[x] =  Mat();//making sure it won't be reused!
 	    				//cout<<"flushed: "<<x<<endl;
 	    			}
 	    			
 	    			wrkrCntr=0;
+	    			//workersFrames.clear();
+	    			workersThreads.clear();
 	    		}
 	    		
 			}		
@@ -143,17 +158,21 @@ int main(int argc, char* argv[])
 		//cout << "end of video file" << endl;
 		break;	
 		}
+		
+		delete frame;
 	}
 	
 	if(wrkrCntr>0){
 		//cout<<"Final Flush :D"<<endl;
-		for(size_t i=0;i<=wrkrCntr;i++){
-				workersThreads[i].join();
-	    		vwr.write(workersFrames[i]);
+		//cout<<wrkrCntr<<endl;
+		for(size_t i=0;i<wrkrCntr;i++){
+			//cout<<i<<endl;
+				(*(workersThreads[i])).join();
+	    		vwr.write(((workersFrames[i])));
 		}
 		
 	}
-	//delete frame;
+//	delete frame;
 	//cout << "done" << endl;
 
 	vwr.release();

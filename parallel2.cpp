@@ -15,12 +15,15 @@ using namespace ff;
 
 /* ----- utility function ------- */ 
 template<typename T> 
-T *Mat2uchar(cv::Mat &in) { 
+T *PrepareFrame(cv::Mat &in, uchar * dst, int &min, int &max) { 
 	T *out = new T[in.rows * in.cols]; 
 	for (int i = 0; i < in.rows; ++i) 
 		for (int j = 0; j < in.cols; ++j) {
 			Vec3b intensity = in.at<Vec3b>(i, j);//changing to grayscale while at it :D
 			out[i * (in.cols) + j] = (intensity.val[0]+intensity.val[1]+intensity.val[2])/3; 
+			dst[i * (in.cols) + j]=0;
+			max=out[i * (in.cols) + j]>max?out[i * (in.cols) + j]:max;
+			min=out[i * (in.cols) + j]<min?out[i * (in.cols) + j]:min;
 		}
 	return out; 
 } 
@@ -81,11 +84,13 @@ struct Worker : ff_node_t<Mat> {
 
    	long cols=(*frame).cols, rows = (*frame).rows;
 	//ParallelFor pr(numSubWrkrs);
-	uchar * src=Mat2uchar<uchar>(*frame);
-	bool sob=sobel;
-	double min, max;
-	if(!sobel)
-	cv::minMaxLoc(*frame, &min, &max);
+	uchar * dst = new uchar[rows * cols];
+	int min=255, max=0;
+	uchar * src=PrepareFrame<uchar>(*frame,dst,min,max);
+	//bool sob=sobel;
+	
+	//if(!sobel)
+	//cv::minMaxLoc(*frame, &min, &max);
 
 	/*if (numSubWrkrs>1)
 	{
@@ -123,9 +128,9 @@ struct Worker : ff_node_t<Mat> {
 			long sum = abs(gx) + abs(gy); 
 			if (sum > 255) sum = 255; 
 			else if (sum < 0) sum = 0; 
-			src[y*cols+x] = sum; 
+			dst[y*cols+x] = sum; 
 		}else{
-				src[y*cols+x] = 255 / (max - min)*(src[y*cols+x] - min);
+				dst[y*cols+x] = 255.0 / (max - min)*(src[y*cols+x] - min);
 		}
 		}
 	}
@@ -134,7 +139,7 @@ struct Worker : ff_node_t<Mat> {
 	}
 
 
-		(*frame) = Mat(rows, cols, CV_8U, src, Mat::AUTO_STEP);
+		(*frame) = Mat(rows, cols, CV_8U, dst, Mat::AUTO_STEP);
 
 	
 	

@@ -1,0 +1,6 @@
+/home/alleboudy/spm/build/CMakeFiles/future.dir
+/home/alleboudy/spm/build/CMakeFiles/nonOrdparallel.dir
+/home/alleboudy/spm/build/CMakeFiles/parallel2.dir
+/home/alleboudy/spm/build/CMakeFiles/parallel3.dir
+/home/alleboudy/spm/build/CMakeFiles/sequential.dir
+/home/alleboudy/spm/build/CMakeFiles/threaded.dir
