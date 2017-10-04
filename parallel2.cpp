@@ -53,6 +53,7 @@ static inline long yGradient(uchar * image, long cols, long x, long y) {
 struct Emitter : ff_node_t<Mat> {
     VideoCapture cap;
     Emitter(VideoCapture inputVideoPath):cap(inputVideoPath) {}
+   
     Mat * svc(Mat *) {
 	while(true) {
 		Mat * frame = new Mat();
@@ -147,7 +148,7 @@ int main(int argc, char* argv[])
 	auto started = std::chrono::high_resolution_clock::now();
 
     if(argc != 5) {
-      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2 100 sobel"<<endl<<"where 2 is the number of workers , sobel is the filter to apply [ sobel for the sobel filter, otherwise contrast stretching is applied] "<<endl; 
+      cout << "Invalid arguments"<<endl<< "Example usage: " << argv[0] << " inputVideoPath outputVideoPath 2 sobel"<<endl<<"where 2 is the number of workers , sobel is the filter to apply [ sobel for the sobel filter, otherwise contrast stretching is applied] "<<endl; 
       return(-1); 
     }
     
